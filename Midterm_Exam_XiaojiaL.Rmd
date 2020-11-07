@@ -1,0 +1,154 @@
+---
+title: "Midterm Exam"
+author: "Your Name"
+date: "11/2/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readxl")
+library("ggplot2")
+library("pwr")
+library("MASS")
+library("dplyr")
+library("rstanarm")
+```
+
+## Instruction
+
+This is your midterm exam that you are expected to work on it alone.  You may NOT  discuss any of the content of your exam with anyone except your instructor. This includes text, chat, email and other online forums.  We expect you to respect and follow the [GRS Academic and Professional Conduct Code](http://www.bu.edu/cas/files/2017/02/GRS-Academic-Conduct-Code-Final.pdf). 
+
+Although you may NOT ask anyone directly, you are allowed to use external resources such as R codes on the Internet.  If you do use someone's code, please make sure you clearly cite the origin of the code.
+
+When you finish, please compile and submit the PDF file and the link to the GitHub repository that contains the entire analysis.
+
+
+## Introduction
+
+In this exam, you will act as both the client and the consultant for the data that you collected in the data collection exercise (20pts).  Please note that you are not allowed to change the data.  The goal of this exam is to demonstrate your ability to perform the statistical analysis that you learned in this class so far.  It is important to note that significance of the analysis is not the main goal of this exam but the focus is on the appropriateness of your approaches.
+
+### Data Description (10pts)
+
+Please explain what your data is about and what the comparison of interest is.  In the process, please make sure to demonstrate that you can load your data properly into R.
+
+```{r }
+#load data into Ra
+growth <- read_excel("Data_Exe.xlsx")
+growth <- as.data.frame(growth)
+head(growth)
+```
+
+What My Data is: 
+For this exercise, I’m collecting data of the daily growth in tags of 2 different characters from the same mobile game. The tags are counted from the same fan-work platform in order to simplify the comparison.
+Variable Reference:  
+Date - A sequence of numberic value in mmdd format.  
+GrowthA - The daily growth in tag number of character A (the new character)  
+GrowthB - The daily growth in tag number of character B (the old character)  
+
+Comparison of Interest:  
+If there's a difference in daily tag's growth trend between a new character and an old one.  
+
+### EDA (10pts)
+
+Please create one (maybe two) figure(s) that highlights the contrast of interest.  Make sure you think ahead and match your figure with the analysis.  For example, if your model requires you to take a log, make sure you take log in the figure as well.
+
+```{r}
+ggplot(data = growth, aes(x = Date, y)) + 
+     geom_point(aes(x = Date, y = GrowthA), color=alpha('red', 0.5), shape=18) + 
+     geom_point(aes(x = Date, y = GrowthB),color=alpha('blue', 0.5), shape=23) +
+     ggtitle("GrowthA vs Growth B Scatter Plot - Character A-red; B-blue")
+
+
+ggplot(data = growth, aes(x = Date, y)) +
+     geom_line(aes(x = Date, y = GrowthA), color=alpha('red', 0.5)) + 
+     geom_line(aes(x = Date, y = GrowthB), color=alpha('blue', 0.5)) +
+     ggtitle("GrowthA vs Growth B Frequency Plot - Character A-red; B-blue")
+```
+
+
+
+### Power Analysis (10pts)
+
+Please perform power analysis on the project.  Use 80% power, the sample size you used and infer the level of effect size you will be able to detect.  Discuss whether your sample size was enough for the problem at hand.  Please note that method of power analysis should match the analysis.  Also, please clearly state why you should NOT use the effect size from the fitted model.
+
+```{r }
+pwr.t.test(n=11, power=0.8, sig.level=0.05, type = "two.sample", alternative="two.sided")
+```
+The level of effect size I will be able to detect is around 1.26.  
+
+
+### Modeling (10pts)
+
+Please pick a regression model that best fits your data and fit your model.  Please make sure you describe why you decide to choose the model. Also, if you are using GLM, make sure you explain your choice of link function as well.
+```{r }
+mean(growth$GrowthA)
+var(growth$GrowthA)
+
+mean(growth$GrowthB)
+var(growth$GrowthB)
+
+#Negative Binomial
+M1 <- glm.nb(GrowthA ~ Date, data = growth, link = "identity")
+M2 <- glm.nb(GrowthB ~ Date, data = growth, link = "identity")
+
+```
+After serveral comparism of fits, I decided to use identity link function.
+Despite the fact that log link prevents the negative data which make sense in this context, it has worse fit compared with identity link.  
+This could partly because our data sparse greatly, which makes it not so realistic to fit those points with a curvilinear line.  
+
+### Validation (10pts)
+
+Please perform a necessary validation and argue why your choice of the model is appropriate.  
+
+```{r }
+summary(M1)
+par(mfrow=c(2,2))
+plot(M1)
+
+summary(M2)
+par(mfrow=c(2,2))
+plot(M2)
+```
+Because my dataset is discrete and I'm performing counting of events happened, the optimal choice should be Poisson distribution.  
+Meanwhile, since the "mean equals to variance" assumption is not fulfilled as printed above, I decided to look into negative binomial distribution with identity as the link function. Reasons are argued as in previous question.  
+Here I'm using glm.nb function to help create 2 models for each growth.  
+
+### Inference (10pts)
+
+Based on the result so far please perform statistical inference to compare the comparison of interest.
+
+```{r }
+confint(M1)
+confint(M2)
+```
+Because I only have one varible for each set, statistical inference is hard to perform. Here I'm comparing the confidence interval between the result, it seems the two models differ from each other a lot.  
+The difference can be observed from summary of the models, I will explain this more in next discussion part.
+
+### Discussion (10pts)
+
+Please clearly state your conclusion and the implication of the result.   
+
+Comparing the qq-plots:  
+  Without taking into account the fact of small sample size, the two datasets display the pattern of coming from different distribution.  
+  
+Analyzing the Residual vs Fitted & Scale Location:
+  The model for GrowthA shows a better fit and a smoother magnitude change of standardized residuals.  
+  
+Overall implications:  
+  Compare with old character's tag growth, the new character's tag growth has a stronger negative correlation with date. As time goes, the new character's tag growth slow down. In contrast, the old character's tag growth remained flexible without a significant correlation with date.  
+
+
+### Limitations and future opportunity. (10pts)
+
+Please list concerns about your analysis.  Also, please state how you might go about fixing the problem in your future study.
+
+The biggest concern is that, the size of dataset is really small. Since the variability is really big, as shown above in the scatterplot, it will be better if I can include more observations. What's more, we have only one variable which is time.  
+We should be cautious that there might be other reasons for tag growth to perform this way, and the model may be more functional if we look into a longer time period.
+
+### Comments or questions
+If you have any comments or questions, please write them here.
+
